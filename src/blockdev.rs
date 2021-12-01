@@ -42,6 +42,13 @@ use crate::util::*;
 
 use crate::{runcmd, runcmd_output};
 
+use once_cell::sync::OnceCell;
+
+pub fn get_start_time() -> &'static std::time::SystemTime {
+    static START_TIME: OnceCell<std::time::SystemTime> = OnceCell::new();
+    START_TIME.get_or_init(std::time::SystemTime::now)
+}
+
 #[derive(Debug)]
 pub struct Disk {
     pub path: String,
@@ -138,7 +145,7 @@ impl Disk {
                 .write(true)
                 .open(&self.path)
                 .with_context(|| format!("opening {}", &self.path))?;
-            reread_partition_table(&mut f).map(|_| Vec::new())
+            reread_partition_table(&mut f, 20).map(|_| Vec::new())
         };
         if rereadpt_result.is_ok() {
             return rereadpt_result;
@@ -218,7 +225,7 @@ impl PartTableKernel {
 
 impl PartTable for PartTableKernel {
     fn reread(&mut self) -> Result<()> {
-        reread_partition_table(&mut self.file)?;
+        reread_partition_table(&mut self.file, 20)?;
         udev_settle()
     }
 }
@@ -823,7 +830,8 @@ fn lsblk_all_and_reread_partition_tables() -> Result<Vec<HashMap<String, String>
     let output = cmd_output(&mut cmd)?;
     for dev in output.lines() {
         if let Ok(mut fd) = std::fs::File::open(dev) {
-            let _ = reread_partition_table(&mut fd);
+            eprintln!("[{:?}]: processing {}", get_start_time().elapsed(), dev);
+            let _ = reread_partition_table(&mut fd, 5);
         }
     }
     udev_settle()?;
@@ -974,11 +982,16 @@ pub fn get_blkdev_deps_recursing(device: &Path) -> Result<Vec<PathBuf>> {
     Ok(ret)
 }
 
-fn reread_partition_table(file: &mut File) -> Result<()> {
+fn reread_partition_table(file: &mut File, max_retries: u32) -> Result<()> {
     let fd = file.as_raw_fd();
     // Reread sometimes fails inexplicably.  Retry several times before
     // giving up.
-    for retries in (0..20).rev() {
+    for retries in (0..max_retries).rev() {
+        eprintln!(
+            "[{:?}] {}: rereaidng pt",
+            get_start_time().elapsed(),
+            max_retries - retries,
+        );
         let result = unsafe { ioctl::blkrrpart(fd) };
         match result {
             Ok(_) => break,

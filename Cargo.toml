@@ -39,6 +39,7 @@ lto = true
 debug = true
 
 [dependencies]
+once_cell=">=1.8.0"
 anyhow = ">= 1.0.38, < 2"
 bincode = "^1.3"
 bytes = ">= 1.0.1, < 1.2.0"

@@ -20,6 +20,7 @@ use libcoreinst::{cmdline, download, install, live, osmet, source};
 use cmdline::*;
 
 fn main() -> Result<()> {
+    libcoreinst::blockdev::get_start_time();
     match Cmd::from_args() {
         Cmd::Download(c) => download::download(c),
         Cmd::Install(c) => install::install(c),

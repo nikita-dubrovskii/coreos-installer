@@ -18,12 +18,43 @@ mod rootmap;
 mod stream_hash;
 mod unique_fs;
 
+use std::convert::TryFrom;
+
 use anyhow::Result;
 use structopt::StructOpt;
 
 use crate::cmdline::*;
 
+use nix::sys::signal;
+
+extern "C" fn sigterm_h(n: i32, si: *mut libc::siginfo_t, _: *mut libc::c_void) {
+    let signo = if let Ok(s) = signal::Signal::try_from(n) {
+        s.as_str().to_owned()
+    } else {
+        n.to_string()
+    };
+    unsafe {
+        let pid = if si.is_null() { -1 } else { (*si).si_pid() };
+        eprintln!(
+            "[{:?}] [{}]: got {} from {}",
+            libcoreinst::blockdev::get_start_time().elapsed(),
+            libc::getpid(),
+            signo,
+            pid
+        );
+    }
+}
+
 fn main() -> Result<()> {
+    libcoreinst::blockdev::get_start_time();
+    let sig_action = signal::SigAction::new(
+        signal::SigHandler::SigAction(sigterm_h),
+        signal::SaFlags::SA_SIGINFO,
+        signal::SigSet::all(),
+    );
+    unsafe {
+        signal::sigaction(signal::SIGTERM, &sig_action)?;
+    }
     match Cmd::from_args() {
         Cmd::Kargs(c) => kargs::kargs(c),
         Cmd::Rootmap(c) => rootmap::rootmap(c),
