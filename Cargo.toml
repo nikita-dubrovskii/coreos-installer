@@ -46,7 +46,7 @@ byte-unit = ">= 3.1.0, < 5.0.0"
 cpio = "^0.2"
 flate2 = "^1.0"
 glob = "^0.3"
-gptman = { version = ">= 0.7, < 0.9", default-features = false }
+gptman = { version = ">= 0.7, < 1.1", default-features = false }
 hex = "^0.4"
 lazy_static = "^1.4"
 libc = "^0.2"
